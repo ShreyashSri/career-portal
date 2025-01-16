@@ -1,0 +1,43 @@
+{# edit_opportunity.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-main">
+        <h2>Edit Opportunity</h2>
+        <div class="admin-form">
+            <form method="POST">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" value="{{ opportunity.title }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" rows="4" required>{{ opportunity.description }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select name="type" class="form-control" required>
+                        <option value="internship" {% if opportunity.type == 'internship' %}selected{% endif %}>Internship</option>
+                        <option value="job" {% if opportunity.type == 'job' %}selected{% endif %}>Job</option>
+                        <option value="hackathon" {% if opportunity.type == 'hackathon' %}selected{% endif %}>Hackathon</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Link</label>
+                    <input type="url" name="link" class="form-control" value="{{ opportunity.link }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-control">
+                        <option value="active" {% if opportunity.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if opportunity.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <button type="submit" class="admin-btn admin-btn-primary">Update Opportunity</button>
+                <a href="{{ url_for('manage_opportunities') }}" class="admin-btn">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

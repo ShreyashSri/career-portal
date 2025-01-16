@@ -1,0 +1,63 @@
+{# manage_users.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-main">
+        <h2>Manage Users</h2>
+        
+        <div class="filters mb-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <input type="text" class="form-control search-input" placeholder="Search users...">
+                </div>
+                <div class="col-md-6">
+                    <select class="form-control bulk-action-select">
+                        <option value="">Bulk Actions</option>
+                        <option value="activate">Activate Selected</option>
+                        <option value="deactivate">Deactivate Selected</option>
+                        <option value="delete">Delete Selected</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" class="select-all"></th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="searchable-item">
+                        <td><input type="checkbox" class="item-checkbox" value="{{ user._id }}"></td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>
+                            <span class="status-badge status-{{ user.is_active|lower }}">
+                                {{ "Active" if user.is_active else "Inactive" }}
+                            </span>
+                        </td>
+                        <td>{{ user.last_login|datetime if user.last_login else 'Never' }}</td>
+                        <td>
+                            <button class="admin-btn" onclick="resetPassword('{{ user._id }}')">Reset Password</button>
+                            <button class="admin-btn admin-btn-danger delete-btn" 
+                                    data-id="{{ user._id }}">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

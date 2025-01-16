@@ -3,6 +3,9 @@ from pymongo import MongoClient
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+from functools import wraps
+from models import User, Opportunity
+from bson import ObjectId
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -77,62 +80,78 @@ def mock_tests():
 def activity_points():
     return render_template('activity_points.html')
 
-@app.route('/apply/<opportunity_type>/<opportunity_id>', methods=['GET', 'POST'])
-def apply(opportunity_type, opportunity_id):
-    opportunity = db.opportunities.find_one({'_id': opportunity_id})
-    
-    if request.method == 'POST':
-        application = {
-            'name': request.form['name'],
-            'email': request.form['email'],
-            'phone': request.form['phone'],
-            'resume': request.form['resume'],
-            'opportunity_id': opportunity_id,
-            'type': opportunity_type,
-            'created_at': datetime.utcnow()
-        }
-        
-        try:
-            db.applications.insert_one(application)
-            flash('Application submitted successfully!', 'success')
-        except Exception as e:
-            flash('Error submitting application. Please try again.', 'danger')
-            print(e)
-        
-        return redirect(url_for(f'{opportunity_type}s'))
-    
-    return render_template('application_form.html', 
-                         opportunity=opportunity,
-                         opportunity_type=opportunity_type)
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash('Access denied. Admin privileges required.', 'danger')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-@app.route('/admin/add-opportunity', methods=['GET', 'POST'])
-def add_opportunity():
-    # Check if the user is an admin
-    if not session.get('is_admin'):
-        flash('Unauthorized access! Please log in as an admin.', 'danger')
-        return redirect(url_for('login'))
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    # Get statistics
+    stats = {
+        'total_opportunities': db.opportunities.count_documents({}),
+        'active_applications': db.applications.count_documents({'status': 'pending'}),
+        'total_users': db.users.count_documents({}),
+        'new_applications': db.applications.count_documents({
+            'created_at': {'$gte': datetime.utcnow() - timedelta(days=1)}
+        })
+    }
     
+    # Get recent activities
+    recent_activities = list(db.activity_log.find().sort('timestamp', -1).limit(10))
+    
+    return render_template('admin/dashboard.html', 
+                         stats=stats, 
+                         recent_activities=recent_activities)
+
+@app.route('/admin/opportunities', methods=['GET'])
+@admin_required
+def manage_opportunities():
+    opportunities = Opportunity.get_all(db)
+    return render_template('admin/manage_opportunities.html', opportunities=opportunities)
+
+@app.route('/admin/opportunity/<opportunity_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_opportunity(opportunity_id):
     if request.method == 'POST':
-        # Extract form data
-        new_opportunity = {
+        updates = {
             'title': request.form['title'],
             'description': request.form['description'],
-            'type': request.form['type'],  # e.g., 'internship', 'job', 'hackathon'
+            'type': request.form['type'],
             'link': request.form['link'],
-            'created_at': datetime.utcnow()
+            'status': request.form['status']
         }
-
-        try:
-            # Insert into the database
-            db.opportunities.insert_one(new_opportunity)
-            flash('Opportunity added successfully!', 'success')
-        except Exception as e:
-            flash('Error adding opportunity. Please try again.', 'danger')
-            print(e)
-        
-        return redirect(url_for('home'))
+        Opportunity.update(db, opportunity_id, updates)
+        flash('Opportunity updated successfully!', 'success')
+        return redirect(url_for('manage_opportunities'))
     
-    return render_template('add_opportunity.html')
+    opportunity = db.opportunities.find_one({'_id': ObjectId(opportunity_id)})
+    return render_template('admin/edit_opportunity.html', opportunity=opportunity)
+
+@app.route('/admin/opportunity/delete/<opportunity_id>', methods=['POST'])
+@admin_required
+def delete_opportunity(opportunity_id):
+    Opportunity.delete(db, opportunity_id)
+    flash('Opportunity deleted successfully!', 'success')
+    return redirect(url_for('manage_opportunities'))
+
+@app.route('/admin/applications')
+@admin_required
+def manage_applications():
+    applications = list(db.applications.find().sort('created_at', -1))
+    return render_template('admin/manage_applications.html', applications=applications)
+
+@app.route('/admin/users')
+@admin_required
+def manage_users():
+    users = list(db.users.find())
+    return render_template('admin/manage_users.html', users=users)
 
 if __name__ == '__main__':
     app.run(debug=True)
