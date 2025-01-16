@@ -1,3 +1,4 @@
+#apps.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from pymongo import MongoClient
 from datetime import datetime, timedelta
@@ -6,13 +7,16 @@ import os
 from functools import wraps
 from models import User, Opportunity
 from bson import ObjectId
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 # MongoDB connection
 try:
-    client = MongoClient('mongodb+srv://ShreyashSri:ggwp@cluster0.bbhp0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+    client = MongoClient('DATABASE_URL')
     db = client['career_portal']
     print("MongoDB connected successfully")
 except Exception as e:
