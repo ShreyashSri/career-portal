@@ -16,8 +16,11 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 # MongoDB connection
 try:
-    client = MongoClient('DATABASE_URL')
+    MONGODB_URI = os.getenv('MONGODB_URI')  # Get from environment variable
+    client = MongoClient(MONGODB_URI)
     db = client['career_portal']
+    # Test the connection
+    client.server_info()  # This will raise an exception if connection fails
     print("MongoDB connected successfully")
 except Exception as e:
     print(f"Could not connect to MongoDB: {e}")
