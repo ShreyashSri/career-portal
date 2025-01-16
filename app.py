@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from functools import wraps
@@ -26,19 +26,18 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Get the login details
         username = request.form['username']
         password = request.form['password']
         
-        # Fetch admin credentials (For simplicity, using hardcoded data)
-        admin_data = db.admins.find_one({'username': username})  # Assumes admins collection in MongoDB
+        # Check in users collection instead of admins
+        user = db.users.find_one({'username': username})
         
-        if admin_data and check_password_hash(admin_data['password'], password):
-            # Store the session information when login is successful
-            session['is_admin'] = True
-            session['username'] = username  # Store username for future reference
+        if user and check_password_hash(user['password'], password):
+            session['is_admin'] = user.get('is_admin', False)
+            session['user_id'] = str(user['_id'])
+            session['username'] = username
             flash('Login successful!', 'success')
-            return redirect(url_for('home'))
+            return redirect(url_for('admin_dashboard'))
         else:
             flash('Invalid username or password. Please try again.', 'danger')
     
