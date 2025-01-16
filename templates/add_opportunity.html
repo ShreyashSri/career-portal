@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Add New Opportunity</h2>
+    <form method="POST" action="{{ url_for('add_opportunity') }}">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" id="title" name="title" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea id="description" name="description" class="form-control" rows="3" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="type" class="form-label">Type</label>
+            <select id="type" name="type" class="form-select" required>
+                <option value="internship">Internship</option>
+                <option value="job">Job</option>
+                <option value="hackathon">Hackathon</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="link" class="form-label">Link</label>
+            <input type="url" id="link" name="link" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Opportunity</button>
+    </form>
+</div>
+{% endblock %}

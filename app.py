@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from pymongo import MongoClient
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
 app = Flask(__name__)
@@ -17,6 +18,34 @@ except Exception as e:
 @app.route('/')
 def home():
     return render_template('home.html')
+
+# Login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        # Get the login details
+        username = request.form['username']
+        password = request.form['password']
+        
+        # Fetch admin credentials (For simplicity, using hardcoded data)
+        admin_data = db.admins.find_one({'username': username})  # Assumes admins collection in MongoDB
+        
+        if admin_data and check_password_hash(admin_data['password'], password):
+            # Store the session information when login is successful
+            session['is_admin'] = True
+            session['username'] = username  # Store username for future reference
+            flash('Login successful!', 'success')
+            return redirect(url_for('home'))
+        else:
+            flash('Invalid username or password. Please try again.', 'danger')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()  # Clear the session
+    flash('Logged out successfully', 'info')
+    return redirect(url_for('home'))
 
 @app.route('/internships')
 def internships():
@@ -75,6 +104,35 @@ def apply(opportunity_type, opportunity_id):
     return render_template('application_form.html', 
                          opportunity=opportunity,
                          opportunity_type=opportunity_type)
+
+@app.route('/admin/add-opportunity', methods=['GET', 'POST'])
+def add_opportunity():
+    # Check if the user is an admin
+    if not session.get('is_admin'):
+        flash('Unauthorized access! Please log in as an admin.', 'danger')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        # Extract form data
+        new_opportunity = {
+            'title': request.form['title'],
+            'description': request.form['description'],
+            'type': request.form['type'],  # e.g., 'internship', 'job', 'hackathon'
+            'link': request.form['link'],
+            'created_at': datetime.utcnow()
+        }
+
+        try:
+            # Insert into the database
+            db.opportunities.insert_one(new_opportunity)
+            flash('Opportunity added successfully!', 'success')
+        except Exception as e:
+            flash('Error adding opportunity. Please try again.', 'danger')
+            print(e)
+        
+        return redirect(url_for('home'))
+    
+    return render_template('add_opportunity.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
