@@ -9,8 +9,7 @@ class User:
         self.username = username
         self.email = email
         self.role = role
-        self.password_hash = generate_password_hash(password) if password else None
-        self.created_at = datetime.utcnow()
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256') if password else None
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -20,7 +19,7 @@ class User:
         user = {
             'username': username,
             'email': email,
-            'password': generate_password_hash(password),
+            'password': generate_password_hash(password, method='pbkdf2:sha256'),
             'role': role,
             'created_at': datetime.utcnow()
         }
