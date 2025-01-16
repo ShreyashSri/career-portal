@@ -90,10 +90,16 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/admin')
+@admin_required  # Using the decorator we created
+def admin_homepage():
+    # Redirect to admin dashboard if no specific admin page is requested
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/admin/dashboard')
 @admin_required
 def admin_dashboard():
-    # Get statistics
+    # Get statistics for the dashboard
     stats = {
         'total_opportunities': db.opportunities.count_documents({}),
         'active_applications': db.applications.count_documents({'status': 'pending'}),
@@ -152,6 +158,7 @@ def manage_applications():
 def manage_users():
     users = list(db.users.find())
     return render_template('admin/manage_users.html', users=users)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
