@@ -14,6 +14,12 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
+@app.template_filter('datetime')
+def format_datetime(value):
+    if value is None:
+        return ""
+    return value.strftime('%Y-%m-%d %H:%M:%S')
+
 # MongoDB connection
 try:
     MONGODB_URI = os.getenv('MONGODB_URI')  # Get from environment variable
@@ -36,17 +42,20 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        # Check in users collection instead of admins
         user = db.users.find_one({'username': username})
         
-        if user and check_password_hash(user['password'], password):
-            session['is_admin'] = user.get('is_admin', False)
-            session['user_id'] = str(user['_id'])
-            session['username'] = username
-            flash('Login successful!', 'success')
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash('Invalid username or password. Please try again.', 'danger')
+        try:
+            if user and check_password_hash(user['password'], password):
+                session['is_admin'] = user.get('is_admin', False)
+                session['user_id'] = str(user['_id'])
+                session['username'] = username
+                flash('Login successful!', 'success')
+                return redirect(url_for('admin_dashboard'))
+        except ValueError as e:
+            print(f"Password verification error: {e}")
+            # Log the error but don't expose it to the user
+        
+        flash('Invalid username or password. Please try again.', 'danger')
     
     return render_template('login.html')
 
@@ -146,6 +155,28 @@ def edit_opportunity(opportunity_id):
     opportunity = db.opportunities.find_one({'_id': ObjectId(opportunity_id)})
     return render_template('admin/edit_opportunity.html', opportunity=opportunity)
 
+@app.route('/admin/opportunity/add', methods=['GET', 'POST'])
+@admin_required
+def add_opportunity():
+    if request.method == 'POST':
+        opportunity = {
+            'title': request.form['title'],
+            'description': request.form['description'],
+            'type': request.form['type'],
+            'link': request.form['link'],
+            'company': request.form.get('company'),
+            'location': request.form.get('location'),
+            'deadline': request.form.get('deadline'),
+            'created_at': datetime.utcnow(),
+            'status': 'active'
+        }
+        
+        db.opportunities.insert_one(opportunity)
+        flash('New opportunity added successfully!', 'success')
+        return redirect(url_for('manage_opportunities'))
+    
+    return render_template('admin/add_opportunity.html')
+
 @app.route('/admin/opportunity/delete/<opportunity_id>', methods=['POST'])
 @admin_required
 def delete_opportunity(opportunity_id):
@@ -164,6 +195,20 @@ def manage_applications():
 def manage_users():
     users = list(db.users.find())
     return render_template('admin/manage_users.html', users=users)
+
+
+@app.route('/admin/reset-user-password/<user_id>', methods=['POST'])
+@admin_required
+def reset_user_password(user_id):
+    new_password = request.form['new_password']
+    hashed_password = generate_password_hash(new_password, method='pbkdf2:sha256')
+    
+    db.users.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {'password': hashed_password}}
+    )
+    flash('Password updated successfully', 'success')
+    return redirect(url_for('manage_users'))
 
 
 if __name__ == '__main__':
