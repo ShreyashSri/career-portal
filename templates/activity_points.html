@@ -1,0 +1,30 @@
+<!-- templates/activity_points.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Activity Points</h2>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Activity Points Guidelines</h5>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <strong>Internships:</strong> 20 points per internship completed
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Hackathons:</strong> 15 points per hackathon participated
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Mock Tests:</strong> 5 points per test completed
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Job Applications:</strong> 10 points per application submitted
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

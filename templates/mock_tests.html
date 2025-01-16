@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Mock Tests</h2>
+
+<div class="row">
+    {% for test in tests %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ test.title }}</h5>
+                <a href="{{ test.link }}" target="_blank" class="btn btn-primary">Start Test</a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <p>No mock tests available at the moment.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

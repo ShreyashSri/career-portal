@@ -1,0 +1,56 @@
+<!-- templates/home.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Internships</h5>
+                <p class="card-text">Find the best internship opportunities to kickstart your career.</p>
+                <a href="{{ url_for('internships') }}" class="btn btn-primary">View Internships</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Jobs</h5>
+                <p class="card-text">Explore full-time job opportunities across various industries.</p>
+                <a href="{{ url_for('jobs') }}" class="btn btn-primary">View Jobs</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Hackathons</h5>
+                <p class="card-text">Participate in exciting hackathons and showcase your skills.</p>
+                <a href="{{ url_for('hackathons') }}" class="btn btn-primary">View Hackathons</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Mock Tests</h5>
+                <p class="card-text">Practice with our mock tests to improve your skills.</p>
+                <a href="{{ url_for('mock_tests') }}" class="btn btn-primary">View Mock Tests</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Activity Points</h5>
+                <p class="card-text">Track and manage your activity points.</p>
+                <a href="{{ url_for('activity_points') }}" class="btn btn-primary">View Activity Points</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

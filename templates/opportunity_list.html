@@ -1,0 +1,44 @@
+<!-- templates/opportunity_list.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">{{ category|title }}s</h2>
+
+<div class="row">
+    {% for opportunity in opportunities %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ opportunity.title }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ opportunity.company }}</h6>
+                <p class="card-text">{{ opportunity.description }}</p>
+                <p class="card-text">
+                    <small class="text-muted">
+                        Location: {{ opportunity.location }}<br>
+                        Deadline: {{ opportunity.deadline }}
+                    </small>
+                </p>
+                {% if opportunity.is_paid %}
+                <p class="card-text text-success">
+                    {% if category == 'job' %}
+                        Salary: ${{ opportunity.payment_amount }}
+                    {% elif category == 'internship' %}
+                        Stipend: ${{ opportunity.payment_amount }}
+                    {% else %}
+                        Prize Pool: ${{ opportunity.payment_amount }}
+                    {% endif %}
+                </p>
+                {% endif %}
+                <a href="{{ url_for('apply', opportunity_type=category, opportunity_id=opportunity._id) }}" class="btn btn-primary">
+                    {% if category == 'hackathon' %}Register Now{% else %}Apply Now{% endif %}
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <p>No {{ category }}s available at the moment.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
