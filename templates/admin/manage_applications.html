@@ -1,4 +1,3 @@
-{# manage_applications.html #}
 {% extends "base.html" %}
 
 {% block content %}
@@ -41,7 +40,7 @@
                             </span>
                         </td>
                         <td>
-                            <a href="{{ url_for('view_application', id=application._id) }}" class="admin-btn">View</a>
+                            <a href="{{ url_for('view_application', application_id=application._id) }}" class="admin-btn">View</a>
                             <button class="admin-btn admin-btn-danger delete-btn" data-id="{{ application._id }}">Delete</button>
                         </td>
                     </tr>

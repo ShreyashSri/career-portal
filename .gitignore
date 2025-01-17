@@ -114,3 +114,6 @@ package-lock.json
 # MongoDB
 mongodb.log
 mongod.lock
+
+static/uploads/resumes/*
+!static/uploads/resumes/.gitkeep

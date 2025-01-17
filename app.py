@@ -1,8 +1,9 @@
 #apps.py
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import os
 from functools import wraps
 from models import User, Opportunity
@@ -187,8 +188,41 @@ def delete_opportunity(opportunity_id):
 @app.route('/admin/applications')
 @admin_required
 def manage_applications():
+    # Get all applications and populate with opportunity details
     applications = list(db.applications.find().sort('created_at', -1))
+    
+    # Populate each application with its opportunity title
+    for application in applications:
+        opportunity = db.opportunities.find_one({'_id': application['opportunity_id']})
+        if opportunity:
+            application['opportunity_title'] = opportunity.get('title', 'Unknown Opportunity')
+        else:
+            application['opportunity_title'] = 'Opportunity Not Found'
+
     return render_template('admin/manage_applications.html', applications=applications)
+
+@app.route('/admin/applications/<application_id>')  # Note: Changed from /application to /applications to match the pattern
+@admin_required
+def view_application(application_id):
+    try:
+        # Find the application
+        application = db.applications.find_one({'_id': ObjectId(application_id)})
+        if not application:
+            flash('Application not found', 'danger')
+            return redirect(url_for('manage_applications'))
+        
+        # Get the associated opportunity
+        opportunity = db.opportunities.find_one({'_id': application['opportunity_id']})
+        if opportunity:
+            application['opportunity_title'] = opportunity.get('title', 'Unknown Opportunity')
+        else:
+            application['opportunity_title'] = 'Opportunity Not Found'
+        
+        return render_template('admin/view_application.html', 
+                            application=application)
+    except Exception as e:
+        flash(f'Error viewing application: {str(e)}', 'danger')
+        return redirect(url_for('manage_applications'))
 
 @app.route('/admin/users')
 @admin_required
@@ -209,6 +243,137 @@ def reset_user_password(user_id):
     )
     flash('Password updated successfully', 'success')
     return redirect(url_for('manage_users'))
+
+UPLOAD_FOLDER = 'static/uploads/resumes'
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/apply/<opportunity_type>/<opportunity_id>', methods=['GET', 'POST'])
+def apply(opportunity_type, opportunity_id):
+    opportunity = db.opportunities.find_one({'_id': ObjectId(opportunity_id)})
+    if not opportunity:
+        flash('Opportunity not found', 'danger')
+        return redirect(url_for('home'))
+    
+    if request.method == 'POST':
+        # Get form data
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        
+        # Handle resume file upload
+        if 'resume' not in request.files:
+            flash('No resume file uploaded', 'danger')
+            return redirect(request.url)
+        
+        resume = request.files['resume']
+        if resume.filename == '':
+            flash('No selected file', 'danger')
+            return redirect(request.url)
+        
+        if resume and allowed_file(resume.filename):
+            # Create a unique filename using timestamp
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_')
+            filename = timestamp + secure_filename(resume.filename)
+            
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            # Save the file
+            resume_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            resume.save(resume_path)
+            
+            # Create application record
+            application = {
+                'opportunity_id': ObjectId(opportunity_id),
+                'opportunity_type': opportunity_type,
+                'name': name,
+                'email': email,
+                'phone': phone,
+                'resume_path': resume_path,
+                'status': 'pending',
+                'created_at': datetime.utcnow()
+            }
+            
+            db.applications.insert_one(application)
+            flash('Application submitted successfully!', 'success')
+            return redirect(url_for('internships' if opportunity_type == 'internship' 
+                                  else 'jobs' if opportunity_type == 'job' 
+                                  else 'hackathons'))
+        else:
+            flash('Invalid file type. Please upload PDF, DOC, or DOCX files only.', 'danger')
+            return redirect(request.url)
+    
+    return render_template('application_form.html', 
+                         opportunity=opportunity)
+
+@app.route('/admin/applications/delete/<application_id>', methods=['POST'])
+@admin_required
+def delete_application(application_id):
+    try:
+        # Get the application to find the resume path
+        application = db.applications.find_one({'_id': ObjectId(application_id)})
+        if application and 'resume_path' in application:
+            # Delete the resume file if it exists
+            try:
+                os.remove(application['resume_path'])
+            except (OSError, FileNotFoundError):
+                # Log this error but continue with application deletion
+                print(f"Could not delete resume file: {application['resume_path']}")
+        
+        # Delete the application from database
+        result = db.applications.delete_one({'_id': ObjectId(application_id)})
+        if result.deleted_count:
+            return jsonify({'success': True, 'message': 'Application deleted successfully'})
+        return jsonify({'success': False, 'message': 'Application not found'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/applications/bulk-action', methods=['POST'])
+@admin_required
+def bulk_action_applications():
+    action = request.form.get('action')
+    application_ids = request.form.getlist('ids[]')
+    
+    if not action or not application_ids:
+        return jsonify({'success': False, 'message': 'Invalid request'})
+    
+    try:
+        if action == 'delete':
+            for app_id in application_ids:
+                # Get application to find resume path
+                application = db.applications.find_one({'_id': ObjectId(app_id)})
+                if application and 'resume_path' in application:
+                    try:
+                        os.remove(application['resume_path'])
+                    except (OSError, FileNotFoundError):
+                        print(f"Could not delete resume file: {application['resume_path']}")
+                
+                # Delete application from database
+                db.applications.delete_one({'_id': ObjectId(app_id)})
+            
+            message = 'Selected applications deleted successfully'
+        
+        elif action in ['approve', 'reject']:
+            status = 'accepted' if action == 'approve' else 'rejected'
+            db.applications.update_many(
+                {'_id': {'$in': [ObjectId(id) for id in application_ids]}},
+                {'$set': {'status': status}}
+            )
+            message = f'Selected applications {status} successfully'
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid action'})
+        
+        return jsonify({'success': True, 'message': message})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 
 if __name__ == '__main__':
