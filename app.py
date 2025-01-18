@@ -16,7 +16,8 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-UPLOAD_FOLDER = 'static/uploads/resumes'
+UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static/uploads/resumes'))
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 
@@ -345,7 +346,7 @@ def apply(opportunity_type, opportunity_id):
                 'name': name,
                 'email': email,
                 'phone': phone,
-                'resume_path': filename,  # Store just the filename
+                'resume_path': resume_path,
                 'status': 'pending',
                 'created_at': datetime.utcnow()
             }
@@ -386,81 +387,32 @@ def delete_application(application_id):
         return jsonify({'success': False, 'message': str(e)})
     
 #---------------------------------------------------------------------------------------------------------------------------------#
-
-@app.route('/admin/applications/bulk-action', methods=['POST'])
-@admin_required
-def bulk_action_applications():
-    action = request.form.get('action')
-    application_ids = request.form.getlist('ids[]')
-    
-    if not action or not application_ids:
-        return jsonify({'success': False, 'message': 'Invalid request'})
-    
-    try:
-        if action == 'delete':
-            for app_id in application_ids:
-                # Get application to find resume path
-                application = db.applications.find_one({'_id': ObjectId(app_id)})
-                if application and 'resume_path' in application:
-                    try:
-                        os.remove(application['resume_path'])
-                    except (OSError, FileNotFoundError):
-                        print(f"Could not delete resume file: {application['resume_path']}")
-                
-                # Delete application from database
-                db.applications.delete_one({'_id': ObjectId(app_id)})
-            
-            message = 'Selected applications deleted successfully'
-        
-        elif action in ['approve', 'reject']:
-            status = 'accepted' if action == 'approve' else 'rejected'
-            db.applications.update_many(
-                {'_id': {'$in': [ObjectId(id) for id in application_ids]}},
-                {'$set': {'status': status}}
-            )
-            message = f'Selected applications {status} successfully'
-        
-        else:
-            return jsonify({'success': False, 'message': 'Invalid action'})
-        
-        return jsonify({'success': True, 'message': message})
-    
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-    
-#---------------------------------------------------------------------------------------------------------------------------------#
     
 # Add this new route to serve resume files securely
 @app.route('/admin/resume/<application_id>')
 @admin_required
 def serve_resume(application_id):
     try:
-        # Find the application
         application = db.applications.find_one({'_id': ObjectId(application_id)})
         if not application or 'resume_path' not in application:
             flash('Resume not found', 'danger')
             return redirect(url_for('manage_applications'))
         
-        # Extract just the filename from the full path
-        filename = os.path.basename(application['resume_path'])
+        resume_path = application['resume_path']
+        directory = os.path.dirname(resume_path)
+        filename = os.path.basename(resume_path)
         
-        # Get the uploads directory path
-        uploads_dir = os.path.abspath(UPLOAD_FOLDER)
-        
-        # Ensure the file exists
-        full_path = os.path.join(uploads_dir, filename)
-        if not os.path.exists(full_path):
+        if not os.path.exists(resume_path):
             flash('Resume file is missing', 'danger')
             return redirect(url_for('manage_applications'))
         
-        # Serve the file from the uploads directory
         return send_from_directory(
-            uploads_dir,
+            directory,
             filename,
             as_attachment=True
         )
     except Exception as e:
-        print(f"Error serving resume: {e}")  # Log the error
+        print(f"Error serving resume: {e}")  # For debugging
         flash('Error accessing resume file', 'danger')
         return redirect(url_for('manage_applications'))
     
