@@ -16,7 +16,11 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static/uploads/resumes'))
+# At the top of your file
+if os.environ.get('FLASK_ENV') == 'production':
+    UPLOAD_FOLDER = '/opt/render/project/src/static/uploads/resumes'
+else:
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'resumes')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
@@ -328,25 +332,25 @@ def apply(opportunity_type, opportunity_id):
             return redirect(request.url)
         
         if resume and allowed_file(resume.filename):
-            # Create a unique filename using timestamp
             timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_')
             filename = timestamp + secure_filename(resume.filename)
             
-            # Ensure upload directory exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            # Ensure the upload directory exists
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'resumes')
+            os.makedirs(uploads_dir, exist_ok=True)
             
             # Save the file
-            resume_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            resume_path = os.path.join(uploads_dir, filename)
             resume.save(resume_path)
             
-            # Create application record with just the filename
+            # Store only the filename in the database
             application = {
                 'opportunity_id': ObjectId(opportunity_id),
                 'opportunity_type': opportunity_type,
                 'name': name,
                 'email': email,
                 'phone': phone,
-                'resume_path': resume_path,
+                'resume_path': filename,  # Store only filename
                 'status': 'pending',
                 'created_at': datetime.utcnow()
             }
@@ -393,31 +397,89 @@ def delete_application(application_id):
 @admin_required
 def serve_resume(application_id):
     try:
+        # Get application
         application = db.applications.find_one({'_id': ObjectId(application_id)})
         if not application or 'resume_path' not in application:
+            print(f"Application not found or missing resume_path: {application}")
             flash('Resume not found', 'danger')
             return redirect(url_for('manage_applications'))
         
-        resume_path = application['resume_path']
-        directory = os.path.dirname(resume_path)
-        filename = os.path.basename(resume_path)
+        # Setup paths
+        base_dir = os.path.dirname(__file__)
+        uploads_dir = os.path.join(base_dir, 'static', 'uploads', 'resumes')
+        filename = os.path.basename(application['resume_path'])
+        full_path = os.path.join(uploads_dir, filename)
         
-        if not os.path.exists(resume_path):
+        print(f"Debug info:")
+        print(f"Base directory: {base_dir}")
+        print(f"Uploads directory: {uploads_dir}")
+        print(f"Filename: {filename}")
+        print(f"Full path: {full_path}")
+        print(f"Upload dir exists: {os.path.exists(uploads_dir)}")
+        if os.path.exists(uploads_dir):
+            print(f"Upload dir contents: {os.listdir(uploads_dir)}")
+        print(f"File exists: {os.path.exists(full_path)}")
+        
+        # Check if file exists
+        if not os.path.exists(full_path):
+            print(f"File not found at path: {full_path}")
             flash('Resume file is missing', 'danger')
             return redirect(url_for('manage_applications'))
         
-        return send_from_directory(
-            directory,
-            filename,
-            as_attachment=True
-        )
+        print(f"Attempting to serve file from: {uploads_dir}")
+        return send_from_directory(uploads_dir, filename, as_attachment=True)
+        
     except Exception as e:
-        print(f"Error serving resume: {e}")  # For debugging
+        print(f"Error in serve_resume: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         flash('Error accessing resume file', 'danger')
         return redirect(url_for('manage_applications'))
     
 #---------------------------------------------------------------------------------------------------------------------------------#
+@app.route('/admin/debug-resume/<application_id>')
+@admin_required
+def debug_resume(application_id):
+    try:
+        # Check database entry
+        application = db.applications.find_one({'_id': ObjectId(application_id)})
+        if not application:
+            return jsonify({'error': 'Application not found'})
 
+        # Get paths
+        base_dir = os.path.dirname(__file__)
+        uploads_dir = os.path.join(base_dir, 'static', 'uploads', 'resumes')
+        
+        # Create diagnostic info
+        info = {
+            'application_data': {
+                'id': str(application['_id']),
+                'resume_path': application.get('resume_path'),
+                'created_at': application.get('created_at').isoformat()
+            },
+            'paths': {
+                'base_dir': base_dir,
+                'uploads_dir': uploads_dir,
+                'uploads_dir_exists': os.path.exists(uploads_dir),
+                'uploads_dir_contents': os.listdir(uploads_dir) if os.path.exists(uploads_dir) else []
+            }
+        }
+        
+        # Check if file exists
+        if 'resume_path' in application:
+            full_path = os.path.join(uploads_dir, application['resume_path'])
+            info['file'] = {
+                'full_path': full_path,
+                'exists': os.path.exists(full_path),
+                'is_file': os.path.isfile(full_path) if os.path.exists(full_path) else False,
+                'size': os.path.getsize(full_path) if os.path.exists(full_path) else None
+            }
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()})
+    
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 if __name__ == '__main__':
     app.run()
