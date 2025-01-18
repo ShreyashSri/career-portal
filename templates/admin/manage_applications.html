@@ -15,14 +15,6 @@
                         </button>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <select class="form-control" id="type-filter">
-                        <option value="">All Types</option>
-                        {% for type in opportunity_types %}
-                            <option value="{{ type }}">{{ type|title }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
             </div>
         </div>
         <div class="admin-table">
