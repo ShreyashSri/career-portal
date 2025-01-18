@@ -136,7 +136,13 @@ def admin_dashboard():
 @admin_required
 def manage_opportunities():
     opportunities = Opportunity.get_all(db)
-    return render_template('admin/manage_opportunities.html', opportunities=opportunities)
+    # Define opportunity types
+    opportunity_types = ['internship', 'job', 'hackathon']
+    return render_template(
+        'admin/manage_opportunities.html', 
+        opportunities=opportunities,
+        opportunity_types=opportunity_types
+    )
 
 @app.route('/admin/opportunity/<opportunity_id>', methods=['GET', 'POST'])
 @admin_required

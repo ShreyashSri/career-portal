@@ -80,12 +80,41 @@
     margin: 2rem 0;
 }
 
+/* Search Input Group */
+.input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .search-input {
     flex: 1;
     padding: 0.75rem 1rem;
     border: 1px solid #e2e8f0;
     border-radius: 0.5rem;
     font-size: 1rem;
+}
+
+.search-btn {
+    padding: 0.75rem 1.5rem;
+    background-color: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.search-btn:hover {
+    background-color: #0052a3;
+}
+
+/* No Results Message */
+.no-results-message td {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
 }
 
 .type-filter {

@@ -54,7 +54,11 @@
         {% endblock %}
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    {% if request.endpoint and 'admin' in request.endpoint %}
+        <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    {% endif %}
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
