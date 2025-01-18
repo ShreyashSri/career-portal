@@ -272,9 +272,17 @@ def add_opportunity():
 @app.route('/admin/opportunity/delete/<opportunity_id>', methods=['POST'])
 @admin_required
 def delete_opportunity(opportunity_id):
-    Opportunity.delete(db, opportunity_id)
-    flash('Opportunity deleted successfully!', 'success')
-    return redirect(url_for('manage_opportunities'))
+    try:
+        Opportunity.delete(db, opportunity_id)
+        return jsonify({
+            'success': True,
+            'message': 'Opportunity deleted successfully!'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 #---------------------------------------------------------------------------------------------------------------------------------#
 
