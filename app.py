@@ -1,10 +1,11 @@
 #apps.py
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, send_from_directory
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
+import os.path
 from functools import wraps
 from models import User, Opportunity
 from bson import ObjectId
@@ -14,6 +15,16 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
+UPLOAD_FOLDER = 'static/uploads/resumes'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.template_filter('datetime')
 def format_datetime(value):
@@ -32,9 +43,13 @@ try:
 except Exception as e:
     print(f"Could not connect to MongoDB: {e}")
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/')
 def home():
     return render_template('home.html')
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 # Login route
 @app.route('/login', methods=['GET', 'POST'])
@@ -60,11 +75,15 @@ def login():
     
     return render_template('login.html')
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/logout')
 def logout():
     session.clear()  # Clear the session
     flash('Logged out successfully', 'info')
     return redirect(url_for('home'))
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/internships')
 def internships():
@@ -73,12 +92,16 @@ def internships():
                          category='internship', 
                          opportunities=opportunities)
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/jobs')
 def jobs():
     opportunities = list(db.opportunities.find({'type': 'job'}))
     return render_template('opportunity_list.html', 
                          category='job', 
                          opportunities=opportunities)
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/hackathons')
 def hackathons():
@@ -87,14 +110,20 @@ def hackathons():
                          category='hackathon', 
                          opportunities=opportunities)
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/mock-tests')
 def mock_tests():
     tests = list(db.mock_tests.find())
     return render_template('mock_tests.html', tests=tests)
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/activity-points')
 def activity_points():
     return render_template('activity_points.html')
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 # Admin required decorator
 def admin_required(f):
@@ -106,11 +135,15 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/admin')
 @admin_required  # Using the decorator we created
 def admin_homepage():
     # Redirect to admin dashboard if no specific admin page is requested
     return redirect(url_for('admin_dashboard'))
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/dashboard')
 @admin_required
@@ -132,6 +165,8 @@ def admin_dashboard():
                          stats=stats, 
                          recent_activities=recent_activities)
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/admin/opportunities', methods=['GET'])
 @admin_required
 def manage_opportunities():
@@ -143,6 +178,8 @@ def manage_opportunities():
         opportunities=opportunities,
         opportunity_types=opportunity_types
     )
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/opportunity/<opportunity_id>', methods=['GET', 'POST'])
 @admin_required
@@ -161,6 +198,8 @@ def edit_opportunity(opportunity_id):
     
     opportunity = db.opportunities.find_one({'_id': ObjectId(opportunity_id)})
     return render_template('admin/edit_opportunity.html', opportunity=opportunity)
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/opportunity/add', methods=['GET', 'POST'])
 @admin_required
@@ -184,12 +223,16 @@ def add_opportunity():
     
     return render_template('admin/add_opportunity.html')
 
+#---------------------------------------------------------------------------------------------------------------------------------#
+
 @app.route('/admin/opportunity/delete/<opportunity_id>', methods=['POST'])
 @admin_required
 def delete_opportunity(opportunity_id):
     Opportunity.delete(db, opportunity_id)
     flash('Opportunity deleted successfully!', 'success')
     return redirect(url_for('manage_opportunities'))
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/applications')
 @admin_required
@@ -207,7 +250,9 @@ def manage_applications():
 
     return render_template('admin/manage_applications.html', applications=applications)
 
-@app.route('/admin/applications/<application_id>')  # Note: Changed from /application to /applications to match the pattern
+#---------------------------------------------------------------------------------------------------------------------------------#
+
+@app.route('/admin/applications/<application_id>')
 @admin_required
 def view_application(application_id):
     try:
@@ -224,17 +269,25 @@ def view_application(application_id):
         else:
             application['opportunity_title'] = 'Opportunity Not Found'
         
+        # Add resume filename for display
+        if 'resume_path' in application:
+            application['resume_filename'] = os.path.basename(application['resume_path'])
+        
         return render_template('admin/view_application.html', 
                             application=application)
     except Exception as e:
         flash(f'Error viewing application: {str(e)}', 'danger')
         return redirect(url_for('manage_applications'))
+    
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/users')
 @admin_required
 def manage_users():
     users = list(db.users.find())
     return render_template('admin/manage_users.html', users=users)
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 
 @app.route('/admin/reset-user-password/<user_id>', methods=['POST'])
@@ -250,14 +303,7 @@ def reset_user_password(user_id):
     flash('Password updated successfully', 'success')
     return redirect(url_for('manage_users'))
 
-UPLOAD_FOLDER = 'static/uploads/resumes'
-ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/apply/<opportunity_type>/<opportunity_id>', methods=['GET', 'POST'])
 def apply(opportunity_type, opportunity_id):
@@ -267,12 +313,10 @@ def apply(opportunity_type, opportunity_id):
         return redirect(url_for('home'))
     
     if request.method == 'POST':
-        # Get form data
         name = request.form.get('name')
         email = request.form.get('email')
         phone = request.form.get('phone')
         
-        # Handle resume file upload
         if 'resume' not in request.files:
             flash('No resume file uploaded', 'danger')
             return redirect(request.url)
@@ -294,14 +338,14 @@ def apply(opportunity_type, opportunity_id):
             resume_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             resume.save(resume_path)
             
-            # Create application record
+            # Create application record with just the filename
             application = {
                 'opportunity_id': ObjectId(opportunity_id),
                 'opportunity_type': opportunity_type,
                 'name': name,
                 'email': email,
                 'phone': phone,
-                'resume_path': resume_path,
+                'resume_path': filename,  # Store just the filename
                 'status': 'pending',
                 'created_at': datetime.utcnow()
             }
@@ -315,8 +359,9 @@ def apply(opportunity_type, opportunity_id):
             flash('Invalid file type. Please upload PDF, DOC, or DOCX files only.', 'danger')
             return redirect(request.url)
     
-    return render_template('application_form.html', 
-                         opportunity=opportunity)
+    return render_template('application_form.html', opportunity=opportunity)
+
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/applications/delete/<application_id>', methods=['POST'])
 @admin_required
@@ -339,6 +384,8 @@ def delete_application(application_id):
         return jsonify({'success': False, 'message': 'Application not found'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+    
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 @app.route('/admin/applications/bulk-action', methods=['POST'])
 @admin_required
@@ -380,6 +427,44 @@ def bulk_action_applications():
     
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+    
+#---------------------------------------------------------------------------------------------------------------------------------#
+    
+# Add this new route to serve resume files securely
+@app.route('/admin/resume/<application_id>')
+@admin_required
+def serve_resume(application_id):
+    try:
+        # Find the application
+        application = db.applications.find_one({'_id': ObjectId(application_id)})
+        if not application or 'resume_path' not in application:
+            flash('Resume not found', 'danger')
+            return redirect(url_for('manage_applications'))
+        
+        # Extract just the filename from the full path
+        filename = os.path.basename(application['resume_path'])
+        
+        # Get the uploads directory path
+        uploads_dir = os.path.abspath(UPLOAD_FOLDER)
+        
+        # Ensure the file exists
+        full_path = os.path.join(uploads_dir, filename)
+        if not os.path.exists(full_path):
+            flash('Resume file is missing', 'danger')
+            return redirect(url_for('manage_applications'))
+        
+        # Serve the file from the uploads directory
+        return send_from_directory(
+            uploads_dir,
+            filename,
+            as_attachment=True
+        )
+    except Exception as e:
+        print(f"Error serving resume: {e}")  # Log the error
+        flash('Error accessing resume file', 'danger')
+        return redirect(url_for('manage_applications'))
+    
+#---------------------------------------------------------------------------------------------------------------------------------#
 
 
 if __name__ == '__main__':

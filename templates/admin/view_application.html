@@ -51,7 +51,11 @@
                 <h3>Resume</h3>
                 {% if application.resume_path %}
                 <div class="resume-actions">
-                    <a href="/{{ application.resume_path }}" target="_blank" class="admin-btn">View Resume</a>
+                    <a href="{{ url_for('serve_resume', application_id=application._id) }}" 
+                       class="admin-btn" 
+                       target="_blank">
+                        View Resume
+                    </a>
                 </div>
                 {% else %}
                 <p>No resume uploaded</p>
