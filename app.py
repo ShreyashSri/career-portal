@@ -495,6 +495,56 @@ def debug_resume(application_id):
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()})
     
 #---------------------------------------------------------------------------------------------------------------------------------#
+#visit /admin/sync-resumes to sync resumes with local directory
+@app.route('/admin/sync-resumes')
+@admin_required
+def sync_resumes():
+    try:
+        # Get all applications with resume paths
+        applications = db.applications.find({'resume_path': {'$exists': True}})
+        
+        # Setup directories
+        prod_dir = '/opt/render/project/src/static/uploads/resumes'
+        local_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'resumes')
+        os.makedirs(local_dir, exist_ok=True)
+        
+        synced = []
+        not_found = []
+        
+        for app in applications:
+            filename = os.path.basename(app['resume_path'])
+            prod_path = os.path.join(prod_dir, filename)
+            local_path = os.path.join(local_dir, filename)
+            
+            # Update database to store only filename
+            db.applications.update_one(
+                {'_id': app['_id']},
+                {'$set': {'resume_path': filename}}
+            )
+            
+            # For development, create a placeholder file if it doesn't exist
+            if not os.path.exists(local_path):
+                try:
+                    with open(local_path, 'w') as f:
+                        f.write(f"Placeholder for {filename}\nOriginal path: {app['resume_path']}")
+                    synced.append(filename)
+                except Exception as e:
+                    not_found.append(filename)
+        
+        return jsonify({
+            'status': 'success',
+            'synced_files': synced,
+            'not_found': not_found,
+            'local_dir': local_dir
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    #---------------------------------------------------------------------------------------------------------------------------------#
 
 if __name__ == '__main__':
     app.run()
