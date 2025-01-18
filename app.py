@@ -391,6 +391,16 @@ def delete_application(application_id):
         return jsonify({'success': False, 'message': str(e)})
     
 #---------------------------------------------------------------------------------------------------------------------------------#
+def verify_pdf_file(file_path):
+    """Verify if a file is a valid PDF"""
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(4)
+            # Check for PDF magic number
+            return header.startswith(b'%PDF')
+    except Exception as e:
+        print(f"Error verifying PDF: {e}")
+        return False
     
 # Add this new route to serve resume files securely
 @app.route('/admin/resume/<application_id>')
@@ -400,7 +410,6 @@ def serve_resume(application_id):
         # Get application
         application = db.applications.find_one({'_id': ObjectId(application_id)})
         if not application or 'resume_path' not in application:
-            print(f"Application not found or missing resume_path: {application}")
             flash('Resume not found', 'danger')
             return redirect(url_for('manage_applications'))
         
@@ -410,24 +419,30 @@ def serve_resume(application_id):
         filename = os.path.basename(application['resume_path'])
         full_path = os.path.join(uploads_dir, filename)
         
-        print(f"Debug info:")
-        print(f"Base directory: {base_dir}")
-        print(f"Uploads directory: {uploads_dir}")
-        print(f"Filename: {filename}")
-        print(f"Full path: {full_path}")
-        print(f"Upload dir exists: {os.path.exists(uploads_dir)}")
-        if os.path.exists(uploads_dir):
-            print(f"Upload dir contents: {os.listdir(uploads_dir)}")
-        print(f"File exists: {os.path.exists(full_path)}")
-        
         # Check if file exists
         if not os.path.exists(full_path):
-            print(f"File not found at path: {full_path}")
             flash('Resume file is missing', 'danger')
             return redirect(url_for('manage_applications'))
         
-        print(f"Attempting to serve file from: {uploads_dir}")
-        return send_from_directory(uploads_dir, filename, as_attachment=True)
+        # Verify PDF integrity
+        if not verify_pdf_file(full_path):
+            flash('Invalid or corrupted PDF file', 'danger')
+            return redirect(url_for('manage_applications'))
+        
+        # Serve the file with proper headers
+        response = send_from_directory(
+            uploads_dir, 
+            filename,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+        # Add additional headers for PDF handling
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
         
     except Exception as e:
         print(f"Error in serve_resume: {str(e)}")
