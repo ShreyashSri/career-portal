@@ -190,14 +190,37 @@ def manage_opportunities():
 @admin_required
 def edit_opportunity(opportunity_id):
     if request.method == 'POST':
+        # Convert is_paid from string to boolean
+        is_paid = request.form.get('is_paid') == 'true'
+        
+        # Handle payment amount
+        payment_amount = None
+        if is_paid and request.form.get('payment_amount'):
+            try:
+                payment_amount = float(request.form.get('payment_amount'))
+            except ValueError:
+                payment_amount = None
+
         updates = {
             'title': request.form['title'],
             'description': request.form['description'],
             'type': request.form['type'],
             'link': request.form['link'],
-            'status': request.form['status']
+            'company': request.form.get('company'),
+            'location': request.form.get('location'),
+            'deadline': request.form.get('deadline'),
+            'status': request.form['status'],
+            'is_paid': is_paid,
+            'payment_amount': payment_amount
         }
-        Opportunity.update(db, opportunity_id, updates)
+        
+        # Remove None values to avoid overwriting with null
+        updates = {k: v for k, v in updates.items() if v is not None}
+        
+        db.opportunities.update_one(
+            {'_id': ObjectId(opportunity_id)},
+            {'$set': updates}
+        )
         flash('Opportunity updated successfully!', 'success')
         return redirect(url_for('manage_opportunities'))
     
@@ -210,6 +233,17 @@ def edit_opportunity(opportunity_id):
 @admin_required
 def add_opportunity():
     if request.method == 'POST':
+        # Convert is_paid from string to boolean
+        is_paid = request.form.get('is_paid') == 'true'
+        
+        # Handle payment amount
+        payment_amount = None
+        if is_paid and request.form.get('payment_amount'):
+            try:
+                payment_amount = float(request.form.get('payment_amount'))
+            except ValueError:
+                payment_amount = None
+
         opportunity = {
             'title': request.form['title'],
             'description': request.form['description'],
@@ -219,8 +253,13 @@ def add_opportunity():
             'location': request.form.get('location'),
             'deadline': request.form.get('deadline'),
             'created_at': datetime.utcnow(),
-            'status': 'active'
+            'status': 'active',
+            'is_paid': is_paid,
+            'payment_amount': payment_amount
         }
+        
+        # Remove None values to avoid storing null
+        opportunity = {k: v for k, v in opportunity.items() if v is not None}
         
         db.opportunities.insert_one(opportunity)
         flash('New opportunity added successfully!', 'success')

@@ -14,20 +14,26 @@
                 <p class="card-text">{{ opportunity.description }}</p>
                 <p class="card-text">
                     <small class="text-muted">
-                        Location: {{ opportunity.location }}<br>
-                        Deadline: {{ opportunity.deadline }}
+                        Location: {{ opportunity.location or 'Not specified' }}<br>
+                        Deadline: {{ opportunity.deadline or 'No deadline' }}
                     </small>
                 </p>
                 {% if opportunity.is_paid %}
                 <p class="card-text text-success">
-                    {% if category == 'job' %}
-                        Salary: ${{ opportunity.payment_amount }}
-                    {% elif category == 'internship' %}
-                        Stipend: ${{ opportunity.payment_amount }}
+                    {% if opportunity.payment_amount %}
+                        {% if category == 'job' %}
+                            Salary: ${{ '{:,.2f}'.format(opportunity.payment_amount) }}
+                        {% elif category == 'internship' %}
+                            Stipend: ${{ '{:,.2f}'.format(opportunity.payment_amount) }}
+                        {% elif category == 'hackathon' %}
+                            Prize Pool: ${{ '{:,.2f}'.format(opportunity.payment_amount) }}
+                        {% endif %}
                     {% else %}
-                        Prize Pool: ${{ opportunity.payment_amount }}
+                        Paid (amount not specified)
                     {% endif %}
                 </p>
+                {% else %}
+                <p class="card-text text-muted">Unpaid</p>
                 {% endif %}
                 <a href="{{ url_for('apply', opportunity_type=category, opportunity_id=opportunity._id) }}" class="btn btn-primary">
                     {% if category == 'hackathon' %}Register Now{% else %}Apply Now{% endif %}
